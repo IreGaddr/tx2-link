@@ -39,6 +39,12 @@ tx2-link is the bridge/protocol layer of the TX-2 ecosystem, enabling efficient 
 - **Zero-copy deserialization** - Direct memory mapping where possible
 - **Backpressure support** - Flow control for slow consumers
 
+### Debug Mode
+- **JSON logging** - Pretty-print all messages and deltas for inspection
+- **Human-readable traces** - Operation summaries with timing and sizes
+- **Environment variable control** - Enable with `TX2_DEBUG=1` or `TX2_TRACE=1`
+- **Zero runtime overhead** - Debug checks compile out when disabled
+
 ## Quick Start
 
 ### Delta Compression
@@ -392,6 +398,117 @@ Benchmarks measure:
 - Rate limiter throughput
 - Field-level diff overhead
 
+## Debug Mode
+
+tx2-link includes a comprehensive debug system for inspecting protocol operations without modifying code.
+
+### Environment Variables
+
+Enable debug features using environment variables:
+
+- **`TX2_DEBUG=1`** or **`TX2_DEBUG_JSON=1`** - Enable JSON pretty-printing of all messages, snapshots, and deltas
+- **`TX2_TRACE=1`** - Enable human-readable trace logging with operation timings and sizes
+
+Both can be combined: `TX2_DEBUG=1 TX2_TRACE=1`
+
+### Debug Mode Features
+
+When `TX2_DEBUG=1` is set:
+- All serialized/deserialized messages are logged as pretty-printed JSON
+- World snapshots are logged with entity counts
+- Deltas are logged showing all changes in readable JSON format
+
+When `TX2_TRACE=1` is set:
+- Delta summaries showing entities added/removed/modified
+- Serialization performance (format, size, duration)
+- Delta compression ratios and timing
+- Rate limiter decisions (allowed/blocked, current rate)
+- Transport operations (bytes sent/received)
+
+### Usage
+
+```bash
+# Run with JSON debug logging
+TX2_DEBUG=1 cargo run
+
+# Run with human-readable traces
+TX2_TRACE=1 cargo run
+
+# Run with both
+TX2_DEBUG=1 TX2_TRACE=1 cargo run
+```
+
+### Example Output
+
+With `TX2_TRACE=1`:
+```
+[TX2-LINK] Delta Summary:
+  Timestamp: 2.0 (base: 1.0)
+  Total changes: 5
+  + 1 entities added
+  ~ 2 components modified
+
+[TX2-LINK] Delta compression: 1232875 bytes → 1052 bytes (1171.79× reduction) in 2134µs
+[TX2-LINK] Serialized 1052 bytes using MessagePack in 250µs
+```
+
+With `TX2_DEBUG=1`:
+```
+[TX2-LINK] Serialized Message:
+{
+  "header": {
+    "msg_type": "Delta",
+    "sequence": 42,
+    "timestamp": 1234567890
+  },
+  "payload": {
+    "changes": [
+      {
+        "EntityAdded": { "entity_id": 123 }
+      },
+      {
+        "ComponentAdded": {
+          "entity_id": 123,
+          "component_id": "Position",
+          "data": { "x": 10.0, "y": 20.0 }
+        }
+      }
+    ]
+  }
+}
+```
+
+### Programmatic Access
+
+You can also enable debug mode programmatically:
+
+```rust
+use tx2_link::init_debug_mode;
+
+fn main() {
+    // Reads TX2_DEBUG and TX2_TRACE environment variables
+    init_debug_mode();
+
+    // Your code here - debug logging happens automatically
+}
+```
+
+### Why Debug Mode?
+
+Binary protocols like MessagePack and Bincode are efficient but opaque. Without debug mode, inspecting what's being sent over the wire requires:
+- Packet capture tools
+- Manual deserialization
+- Custom logging code
+
+With debug mode, you get instant visibility into:
+- What data is changing between snapshots
+- How effective delta compression is
+- Serialization format efficiency
+- Rate limiting behavior
+- Network traffic patterns
+
+This makes tx2-link extremely "vibe coding friendly" - you can see exactly what's happening without writing debugging code.
+
 ## Development Status
 
 - [x] Core protocol messages
@@ -402,6 +519,7 @@ Benchmarks measure:
 - [x] Schema versioning and validation
 - [x] Streaming serializer/deserializer
 - [x] Comprehensive benchmarks
+- [x] Debug mode with JSON logging and traces
 - [ ] Compression (zstd/lz4) for large snapshots
 - [ ] Encryption support
 - [ ] Reconnection handling with state recovery

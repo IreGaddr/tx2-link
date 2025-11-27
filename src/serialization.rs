@@ -1,7 +1,9 @@
 use crate::error::Result;
 use crate::protocol::*;
+use crate::debug;
 use serde::{Deserialize, Serialize};
 use bytes::{Bytes, BytesMut, BufMut};
+use std::time::Instant;
 
 pub use crate::protocol::{SerializedComponent, SerializedEntity};
 
@@ -48,7 +50,9 @@ impl BinarySerializer {
     }
 
     pub fn serialize_message(&self, message: &Message) -> Result<Bytes> {
-        match self.format {
+        let start = Instant::now();
+
+        let result = match self.format {
             BinaryFormat::Json => {
                 let json = serde_json::to_vec(message)?;
                 Ok(Bytes::from(json))
@@ -61,11 +65,30 @@ impl BinarySerializer {
                 let bincode_data = bincode::serialize(message)?;
                 Ok(Bytes::from(bincode_data))
             }
+        };
+
+        if let Ok(ref bytes) = result {
+            if debug::is_debug_enabled() {
+                debug::log_message("Serialized", message);
+            }
+
+            if debug::is_trace_enabled() {
+                let format_name = match self.format {
+                    BinaryFormat::Json => "JSON",
+                    BinaryFormat::MessagePack => "MessagePack",
+                    BinaryFormat::Bincode => "Bincode",
+                };
+                debug::trace_serialization(format_name, bytes.len(), start.elapsed().as_micros());
+            }
         }
+
+        result
     }
 
     pub fn deserialize_message(&self, data: &[u8]) -> Result<Message> {
-        match self.format {
+        let start = Instant::now();
+
+        let result = match self.format {
             BinaryFormat::Json => {
                 let message = serde_json::from_slice(data)?;
                 Ok(message)
@@ -78,7 +101,24 @@ impl BinarySerializer {
                 let message = bincode::deserialize(data)?;
                 Ok(message)
             }
+        };
+
+        if let Ok(ref message) = result {
+            if debug::is_debug_enabled() {
+                debug::log_message("Deserialized", message);
+            }
+
+            if debug::is_trace_enabled() {
+                let format_name = match self.format {
+                    BinaryFormat::Json => "JSON",
+                    BinaryFormat::MessagePack => "MessagePack",
+                    BinaryFormat::Bincode => "Bincode",
+                };
+                debug::trace_deserialization(format_name, data.len(), start.elapsed().as_micros());
+            }
         }
+
+        result
     }
 
     pub fn serialize_snapshot(&self, snapshot: &WorldSnapshot) -> Result<Bytes> {

@@ -1,6 +1,8 @@
 use crate::protocol::*;
 use crate::serialization::{WorldSnapshot, Delta};
+use crate::debug;
 use ahash::AHashMap;
+use std::time::Instant;
 
 pub struct DeltaCompressor {
     previous_snapshot: Option<WorldSnapshot>,
@@ -23,6 +25,8 @@ impl DeltaCompressor {
     }
 
     pub fn create_delta(&mut self, current_snapshot: WorldSnapshot) -> Delta {
+        let start = Instant::now();
+
         let timestamp = current_snapshot.timestamp;
         let base_timestamp = self.previous_snapshot.as_ref()
             .map(|s| s.timestamp)
@@ -34,13 +38,30 @@ impl DeltaCompressor {
             self.create_initial_delta(&current_snapshot)
         };
 
-        self.previous_snapshot = Some(current_snapshot);
-
-        Delta {
+        let delta = Delta {
             changes,
             timestamp,
             base_timestamp,
+        };
+
+        // Debug logging
+        if debug::is_debug_enabled() {
+            debug::log_delta("Created", &delta);
         }
+
+        if debug::is_trace_enabled() {
+            debug::trace_delta(&delta);
+            let duration = start.elapsed().as_micros();
+
+            // Estimate sizes for compression ratio
+            let original_size = bincode::serialize(&current_snapshot).unwrap_or_default().len();
+            let delta_size = bincode::serialize(&delta).unwrap_or_default().len();
+            debug::trace_compression(original_size, delta_size, duration);
+        }
+
+        self.previous_snapshot = Some(current_snapshot);
+
+        delta
     }
 
     fn create_initial_delta(&self, snapshot: &WorldSnapshot) -> Vec<DeltaChange> {
