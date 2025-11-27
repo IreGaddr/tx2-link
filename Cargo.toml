@@ -2,6 +2,15 @@
 name = "tx2-link"
 version = "0.1.0"
 edition = "2021"
+authors = ["TX-2 Contributors"]
+license = "MIT"
+description = "Binary protocol for syncing ECS worlds with field-level delta compression"
+repository = "https://github.com/IreGaddr/tx2-link"
+homepage = "https://github.com/IreGaddr/tx2-link"
+documentation = "https://docs.rs/tx2-link"
+keywords = ["ecs", "sync", "protocol", "delta", "compression"]
+categories = ["network-programming", "game-development", "encoding"]
+readme = "README.md"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
